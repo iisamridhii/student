@@ -1,0 +1,339 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+import java.io.*;
+
+// Student class - stores individual student information
+class Student {
+    private String name;
+    private String regNumber;
+
+    public Student(String name, String regNumber) {
+        this.name = name;
+        this.regNumber = regNumber;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getRegNumber() {
+        return regNumber;
+    }
+
+    @Override
+    public String toString() {
+        return regNumber + " - " + name;
+    }
+}
+
+// Attendance class - handles attendance for a specific date
+class Attendance {
+    private String date;
+    private HashMap<String, Boolean> records;
+
+    public Attendance(String date) {
+        this.date = date;
+        this.records = new HashMap<>();
+    }
+
+    public void markAttendance(String regNumber, boolean isPresent) {
+        records.put(regNumber, isPresent);
+    }
+
+    public boolean isPresent(String regNumber) {
+        return records.getOrDefault(regNumber, false);
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public void displayAttendance(ArrayList<Student> students) {
+        System.out.println("\n======== Attendance for " + date + " ==========");
+        int presentCount = 0;
+
+        for (Student s : students) {
+            boolean present = isPresent(s.getRegNumber());
+            String status = present ? "Present" : "Absent";
+            System.out.println(s.getRegNumber() + " | " + s.getName() + " | " + status);
+            if (present) presentCount++;
+        }
+
+        System.out.println("\nTotal Present: " + presentCount + "/" + students.size());
+        int absentCount = students.size() - presentCount;
+        System.out.println("Total Absent: " + absentCount);
+    }
+
+    public void saveToFile(String filename) throws IOException {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename, true))) {
+            writer.write("DATE:" + date);
+            writer.newLine();
+            for (Map.Entry<String, Boolean> entry : records.entrySet()) {
+                writer.write(entry.getKey() + ":" + (entry.getValue() ? "P" : "A"));
+                writer.newLine();
+            }
+            writer.write("---");
+            writer.newLine();
+        }
+    }
+
+    public HashMap<String, Boolean> getRecords() {
+        return records;
+    }
+}
+
+// Main program
+public class AttendanceTracker {
+    private static ArrayList<Student> students = new ArrayList<>();
+    private static ArrayList<Attendance> attendanceRecords = new ArrayList<>();
+
+    private static Scanner scanner = new Scanner(System.in);
+    private static final String STUDENTS_FILE = "students.txt";
+    private static final String ATTENDANCE_FILE = "attendance.txt";
+
+    public static void main(String[] args) {
+        System.out.println("================================");
+        System.out.println("   STUDENT ATTENDANCE TRACKER   ");
+        System.out.println("================================");
+
+        loadStudents();
+        loadAttendance();
+
+        while (true) {
+            showMenu();
+            int choice = getInput("Enter your choice: ");
+            
+            switch (choice) {
+                case 1:
+                    addStudent();
+                    break;
+                case 2:
+                    viewAllStudents();
+                    break;
+                case 3:
+                    markAttendance();
+                    break;
+                case 4:
+                    viewAttendanceReport();
+                    break;
+                case 5:
+                    saveAllData();
+                    System.out.println("Thank you for using Attendance Tracker!");
+                    System.exit(0);
+                    break;
+                default:
+                    System.out.println("Invalid choice! Please try again.");
+            }
+        }
+    }
+
+    private static void showMenu() {
+        System.out.println("\n========== MENU ==========");
+        System.out.println("1. Add Student");
+        System.out.println("2. View All Students");
+        System.out.println("3. Mark Attendance");
+        System.out.println("4. View Attendance Report");
+        System.out.println("5. Exit");
+        System.out.println("==========================");
+    }
+
+    private static int getInput(String prompt) {
+        System.out.print(prompt);
+        while (!scanner.hasNextInt()) {
+            System.out.print("Invalid input! Please enter a number: ");
+            scanner.next();
+        }
+        int choice = scanner.nextInt();
+        scanner.nextLine(); // consume newline
+        return choice;
+    }
+
+    private static void addStudent() {
+        System.out.println("\n--- Add New Student ---");
+        System.out.print("Enter Registration Number: ");
+        String regNumber = scanner.nextLine();
+        
+        // Check if student already exists
+        for (Student s : students) {
+            if (s.getRegNumber().equals(regNumber)) {
+                System.out.println("Student with this Registration Number already exists!");
+                return;
+            }
+        }
+        
+        System.out.print("Enter Student Name: ");
+        String name = scanner.nextLine();
+        
+        students.add(new Student(name, regNumber));
+        System.out.println("Student added successfully!");
+        saveStudentsToFile();
+    }
+
+    private static void viewAllStudents() {
+        System.out.println("\n--- All Students ---");
+        if (students.isEmpty()) {
+            System.out.println("No students found. Please add students first.");
+            return;
+        }
+        
+        System.out.println("\nReg Number | Name");
+        System.out.println("-------------------");
+        for (Student s : students) {
+            System.out.println(s.getRegNumber() + " | " + s.getName());
+        }
+        System.out.println("Total Students: " + students.size());
+    }
+
+    private static void markAttendance() {
+        if (students.isEmpty()) {
+            System.out.println("\nNo students available! Please add students first.");
+            return;
+        }
+        
+        System.out.println("\n--- Mark Attendance ---");
+        System.out.print("Enter Date (YYYY-MM-DD): ");
+        String date = scanner.nextLine();
+        
+        // Check if attendance already marked for this date
+        for (Attendance att : attendanceRecords) {
+            if (att.getDate().equals(date)) {
+                System.out.println("Attendance for " + date + " has already been marked!");
+                System.out.println("Do you want to update it? (y/n): ");
+                String update = scanner.nextLine();
+                if (!update.equalsIgnoreCase("y")) {
+                    return;
+                }
+                attendanceRecords.remove(att);
+                break;
+            }
+        }
+        
+        Attendance newAttendance = new Attendance(date);
+        
+        System.out.println("\nMark attendance for each student:");
+        for (Student s : students) {
+            System.out.print(s.getRegNumber() + " - " + s.getName() + " (Present? y/n): ");
+            String input = scanner.nextLine();
+            boolean isPresent = input.equalsIgnoreCase("y");
+            newAttendance.markAttendance(s.getRegNumber(), isPresent);
+        }
+        
+        attendanceRecords.add(newAttendance);
+        System.out.println("Attendance saved for " + date);
+        saveAttendanceToFile();
+    }
+
+    private static void viewAttendanceReport() {
+        if (attendanceRecords.isEmpty()) {
+            System.out.println("\nNo attendance records found!");
+            return;
+        }
+        
+        System.out.println("\n--- Attendance Reports ---");
+        for (int i = 0; i < attendanceRecords.size(); i++) {
+            System.out.println((i + 1) + ". " + attendanceRecords.get(i).getDate());
+        }
+        
+        System.out.print("Select date (enter number) or 0 for all: ");
+        int choice = getInput("");
+        
+        if (choice == 0) {
+            // Show all attendance records
+            for (Attendance att : attendanceRecords) {
+                att.displayAttendance(students);
+            }
+        } else if (choice > 0 && choice <= attendanceRecords.size()) {
+            attendanceRecords.get(choice - 1).displayAttendance(students);
+        } else {
+            System.out.println("Invalid choice!");
+        }
+    }
+
+    private static void loadStudents() {
+        File file = new File(STUDENTS_FILE);
+        if (!file.exists()) {
+            return;
+        }
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(STUDENTS_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length == 2) {
+                    students.add(new Student(parts[1], parts[0]));
+                }
+            }
+            System.out.println("Loaded " + students.size() + " students.");
+        } catch (IOException e) {
+            System.out.println("Error loading students: " + e.getMessage());
+        }
+    }
+
+    private static void saveStudentsToFile() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(STUDENTS_FILE))) {
+            for (Student s : students) {
+                writer.write(s.getRegNumber() + "," + s.getName());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Error saving students: " + e.getMessage());
+        }
+    }
+
+    private static void loadAttendance() {
+        File file = new File(ATTENDANCE_FILE);
+        if (!file.exists()) {
+            return;
+        }
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(ATTENDANCE_FILE))) {
+            String line;
+            Attendance currentAttendance = null;
+            
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("DATE:")) {
+                    String date = line.substring(5);
+                    currentAttendance = new Attendance(date);
+                    attendanceRecords.add(currentAttendance);
+                } else if (line.equals("---")) {
+                    currentAttendance = null;
+                } else if (currentAttendance != null && line.contains(":")) {
+                    String[] parts = line.split(":");
+                    if (parts.length == 2) {
+                        String regNumber = parts[0];
+                        boolean isPresent = parts[1].equals("P");
+                        currentAttendance.markAttendance(regNumber, isPresent);
+                    }
+                }
+            }
+            System.out.println("Loaded " + attendanceRecords.size() + " attendance records.");
+        } catch (IOException e) {
+            System.out.println("Error loading attendance: " + e.getMessage());
+        }
+    }
+
+    private static void saveAttendanceToFile() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(ATTENDANCE_FILE))) {
+            for (Attendance att : attendanceRecords) {
+                writer.write("DATE:" + att.getDate());
+                writer.newLine();
+                for (Map.Entry<String, Boolean> entry : att.getRecords().entrySet()) {
+                    writer.write(entry.getKey() + ":" + (entry.getValue() ? "P" : "A"));
+                    writer.newLine();
+                }
+                writer.write("---");
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Error saving attendance: " + e.getMessage());
+        }
+    }
+
+    private static void saveAllData() {
+        saveStudentsToFile();
+        saveAttendanceToFile();
+        System.out.println("All data saved successfully!");
+    }
+}
